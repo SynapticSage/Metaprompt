@@ -13,11 +13,11 @@ import tempfile
 import subprocess
 import shelve
 from rich import print
-import google.generativeai as genai
 
 # Set up argparse
 parser = argparse.ArgumentParser(description='Process some files with generative AI.')
 parser.add_argument('text_files', nargs='+', help='List of text files to process')
+parser.add_argument('core', nargs=1, required=True, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=True, help='Prompt to apply to each file')
 parser.add_argument('--append', required=True, help='String to append to the output filename')
 parser.add_argument('--interact', action='store_true', help='Interactively confirm and edit output')
@@ -26,35 +26,23 @@ parser.add_argument('--persist', required=True, help='File location to persist t
 
 args = parser.parse_args()
 
+# Execute the core script
+core_script_path = os.path.join('core', args.core)
+if os.path.isfile(core_script_path):
+    with open(core_script_path) as f:
+        exec(f.read(), globals())
+else:
+    raise FileNotFoundError(f"Core script {core_script_path} not found.")
+
 # Load or create the shelve dictionary
 with shelve.open(args.persist) as shelf:
     if 'history' in shelf:
         history = shelf['history']
     else:
-        history = [...]
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
-# Create the model
-generation_config = {
-    "temperature": 1,
-    "top_p": 0.95,
-    "top_k": 64,
-    "max_output_tokens": 8192,
-    "response_mime_type": "text/plain",
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro-exp-0801",
-    generation_config=generation_config,
-    # safety_settings = Adjust safety settings
-    # See https://ai.google.dev/gemini-api/docs/safety-settings
-    system_instruction="You are a professional software engineer whose role is to grok code libraries you are given. You created a nested hierarchical list of sections of the code where the leaves of the tree are functions and classes. After grokking your job is to create a README.md overviewing the set of scripts a user can run, but not going into too much detail about any one script. Thereafter, you will be called upon to create one README per script.",
-)
-
-chat_session = model.start_chat(
-    history=history
-)
+        # Ensure `history` is defined in the core script
+        if 'history' not in globals():
+            raise ValueError("The core script must define a `history` variable.")
+        history = globals()['history']
 
 # Function to write content to a temporary file and open it with an editor
 def edit_content_with_editor(prompt, response, editor):
@@ -69,6 +57,9 @@ def edit_content_with_editor(prompt, response, editor):
 
     os.remove(tmpfile_path)
     return edited_content
+
+# Start chat session with history
+chat_session = model.start_chat(history=history)
 
 # Process each file
 for text_file in args.text_files:
@@ -89,7 +80,7 @@ for text_file in args.text_files:
                 break
             else:
                 response_text = edit_content_with_editor(prompt_with_content, response_text, args.editor)
-    
+
     # Save the output with appended string
     output_filename = f"{os.path.splitext(text_file)[0]}{args.append}{os.path.splitext(text_file)[1]}"
     with open(output_filename, 'w') as out_f:
