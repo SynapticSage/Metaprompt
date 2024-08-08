@@ -11,10 +11,28 @@ import os
 import argparse
 import tempfile
 import subprocess
+import shelve
 from rich import print
 import google.generativeai as genai
 
-# Configure the API key
+# Set up argparse
+parser = argparse.ArgumentParser(description='Process some files with generative AI.')
+parser.add_argument('text_files', nargs='+', help='List of text files to process')
+parser.add_argument('--prompt', required=True, help='Prompt to apply to each file')
+parser.add_argument('--append', required=True, help='String to append to the output filename')
+parser.add_argument('--interact', action='store_true', help='Interactively confirm and edit output')
+parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
+parser.add_argument('--persist', required=True, help='File location to persist the shelve dictionary')
+
+args = parser.parse_args()
+
+# Load or create the shelve dictionary
+with shelve.open(args.persist) as shelf:
+    if 'history' in shelf:
+        history = shelf['history']
+    else:
+        history = [...]
+
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 # Create the model
@@ -35,18 +53,8 @@ model = genai.GenerativeModel(
 )
 
 chat_session = model.start_chat(
-    history=[...]
+    history=history
 )
-
-# Set up argparse
-parser = argparse.ArgumentParser(description='Process some files with generative AI.')
-parser.add_argument('text_files', nargs='+', help='List of text files to process')
-parser.add_argument('--prompt', required=True, help='Prompt to apply to each file')
-parser.add_argument('--append', required=True, help='String to append to the output filename')
-parser.add_argument('--interact', action='store_true', help='Interactively confirm and edit output')
-parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
-
-args = parser.parse_args()
 
 # Function to write content to a temporary file and open it with an editor
 def edit_content_with_editor(prompt, response, editor):
@@ -66,7 +74,7 @@ def edit_content_with_editor(prompt, response, editor):
 for text_file in args.text_files:
     with open(text_file, 'r') as f:
         file_content = f.read()
-    
+
     # Apply the prompt to the file content
     prompt_with_content = f"{args.prompt}\n\n{file_content}"
     response = chat_session.send_message(prompt_with_content)
@@ -86,5 +94,10 @@ for text_file in args.text_files:
     output_filename = f"{os.path.splitext(text_file)[0]}{args.append}{os.path.splitext(text_file)[1]}"
     with open(output_filename, 'w') as out_f:
         out_f.write(response_text)
+
+    # Save the current state to the shelve dictionary
+    with shelve.open(args.persist) as shelf:
+        shelf['history'] = chat_session.history
+        shelf[text_file] = {'input_index': len(chat_session.history) - 2, 'output_index': len(chat_session.history) - 1}
 
 print("Processing complete. Output files created.")
