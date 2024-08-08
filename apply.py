@@ -19,10 +19,10 @@ parser = argparse.ArgumentParser(description='Process some files with generative
 parser.add_argument('text_files', nargs='+', help='List of text files to process')
 parser.add_argument('core', nargs=1, required=True, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=True, help='Prompt to apply to each file')
-parser.add_argument('--append', required=True, help='String to append to the output filename')
+parser.add_argument('--append', default="_work", help='String to append to the output filename')
 parser.add_argument('--interact', action='store_true', help='Interactively confirm and edit output')
 parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
-parser.add_argument('--persist', required=True, help='File location to persist the shelve dictionary')
+parser.add_argument('--persist', default="{CORE}", required=True, help='File location to persist the shelve dictionary')
 
 args = parser.parse_args()
 
@@ -35,6 +35,10 @@ else:
     raise FileNotFoundError(f"Core script {core_script_path} not found.")
 
 # Load or create the shelve dictionary
+if args.persist == "{CORE}":
+    args.persist = f"{os.path.basename(args.core).split('.')[0]}.shelve"
+if os.path.dirname(args.persist) and not os.path.exists(os.path.dirname(args.persist)): 
+    os.makedirs(os.path.dirname(args.persist))
 with shelve.open(args.persist) as shelf:
     if 'history' in shelf:
         history = shelf['history']
