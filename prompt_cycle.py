@@ -1,10 +1,17 @@
 """
-Install the Google AI Python SDK
+METAPROMPT, google ai studio meta prompting
+`prompt_cycle.py` is a script that applies a prompt to a list of text files.
+The script uses the `google.generativeai` library to generate responses to the
+prompt. The script takes the following arguments:
 
-$ pip install google-generativeai
-
-See the getting started guide for more information:
-https://ai.google.dev/gemini-api/docs/get-started/python
+- `text_files`: A list of text files to process.
+- `core`: The core conversation script to execute from the `./core` folder.
+- `prompt`: The prompt to apply to each file.
+- `append`: A string to append to the output filename.
+- `interact`: A flag to interactively confirm and edit the output.
+- `editor`: The editor to use for interactive mode (default: `nvim`).
+- `persist`: The file location to persist the shelve dictionary.
+- `ignore_checkpoint`: A flag to ignore the checkpoint file.
 """
 
 import os
