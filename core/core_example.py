@@ -1,3 +1,4 @@
+import os
 import google.generativeai as genai
 
 # Configure the API key
@@ -17,7 +18,9 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
     # safety_settings = Adjust safety settings
     # See https://ai.google.dev/gemini-api/docs/safety-settings
-    system_instruction="...",
+    system_instruction="You are an {ask for ROLE} at {ask for COMPANY}.",
 )
+
+chat_session = model.start_chat()
 
 history = [ ]  # Define history here or load it from somewhere
