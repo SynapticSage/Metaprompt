@@ -1,2 +1,3 @@
 src/__pycache__
 *.db
+your_project_name.egg-info

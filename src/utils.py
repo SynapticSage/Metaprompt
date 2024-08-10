@@ -2,7 +2,8 @@ import os
 import shelve
 import subprocess
 import tempfile
-
+folder = os.path.dirname(__file__)
+corefolder = os.path.abspath(os.path.join(folder, '..', 'core'))
 
 def get_core_script(args):
     """
@@ -21,6 +22,21 @@ def get_core_script(args):
         raise FileNotFoundError(f"Core script {core_script_path} not found.")
 
     return file_contents
+
+def run_core_script(args):
+    """
+    runs core script using IPython run -i 
+
+    and then place the variables into globals()
+    """
+    from IPython import get_ipython
+    core = os.path.join(corefolder, args.core)
+    if not os.path.exists(core):
+        raise FileNotFoundError(f"Core script {core} not found.")
+    ipython = get_ipython()
+    ipython.run_line_magic(f'run', f'-i "{core}"')
+    for var in ipython.user_ns:
+        globals()[var] = ipython.user_ns[var]
 
 def load_and_combine_history(args, 
                 history:list=[], 
@@ -66,6 +82,9 @@ def load_and_combine_history(args,
     return history
 
 def edit_content_with_editor(prompt, response, editor):
+    """
+    Edit the content with the specified editor.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmpfile:
         tmpfile.write(f"# {prompt}\n\n{response}".encode('utf-8'))
         tmpfile_path = tmpfile.name
@@ -77,3 +96,19 @@ def edit_content_with_editor(prompt, response, editor):
 
     os.remove(tmpfile_path)
     return edited_content
+
+def expand_folders(text_files):
+    """
+    Expand any folders in the list of files of args.text_files.
+
+    If a folder is folder, use os.walk to get all files in the folder
+    """
+    expanded_files = []
+    for text_file in text_files:
+        if os.path.isdir(text_file):
+            for root, _, files in os.walk(text_file):
+                for file in files:
+                    expanded_files.append(os.path.join(root, file))
+        else:
+            expanded_files.append(text_file)
+    return expanded_files

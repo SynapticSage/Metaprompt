@@ -1,3 +1,4 @@
 rich 
 google-generativeai
 ipython
+pdbpp

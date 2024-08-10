@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 METAPROMPT, google ai studio meta prompting
 `prompt_cycle.py` is a script that applies a prompt to a list of text files.
@@ -19,39 +20,48 @@ import argparse
 import shelve
 from rich import print
 from src import utils
+from tqdm import tqdm
 
-test = True
+test = False
 if test:
     import sys
-    sys.argv = ["apply.py", "data/text.txt", "core_example.py", "--prompt", "Prompt text", "--append", "_work", "--interact", "--editor", "nvim", "--persist", "test.shelve"]
+    sys.argv = ["apply.py", "data/text.txt", "core_example.py", "--prompt", "Prompt text", "--append", "_work", "--editor", "nvim", "--persist", "test.shelve"]
 
 # Set up argparse
 parser = argparse.ArgumentParser(description='Process some files with generative AI.')
 parser.add_argument('text_files', nargs='+', help='List of text files to process')
-parser.add_argument('core', nargs=1, type=str, help='Core conversation script to execute from the ./core folder')
-parser.add_argument('--prompt', required=True, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
+parser.add_argument('core', nargs='?', type=str, help='Core conversation script to execute from the ./core folder')
+parser.add_argument('--prompt', required=False, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
 parser.add_argument('--append', default="_work", help='String to append to the output filename')
-parser.add_argument('--interact', action='store_true', help='Interactively confirm and edit output')
+parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
 parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
-parser.add_argument('--persist', default="{CORE}", required=True, help='File location to persist the shelve dictionary')
+parser.add_argument('--persist', default="{CORE}", required=False, help='File location to persist the shelve dictionary')
 parser.add_argument('--ignore_checkpoint', action='store_true', help='Ignore the checkpoint file')
 
 args = parser.parse_args()
+if args.core is None:
+    args.core = "default.py" if os.path.exists("core/default.py") else "core_example.py"
 
 # Execute the core script
-exec(utils.get_core_script(args), globals())
-history = locals()['history']
-model = locals()['model']
+# exec(utils.get_core_script(args), globals())
+utils.run_core_script(args)
 chat_session = locals()['chat_session']
+model = locals()['model']
+history = chat_session.history
 
 # Load or create the shelve dictionary
 history = utils.load_and_combine_history(args, history)
+
+import pdb; pdb.set_trace()
+
+# Expand out any folders
+args.text_files = utils.expand_folders(args.text_files)
 
 # Start chat session with history
 chat_session = model.start_chat(history=history)
 
 # Process each file
-for i_file, text_file in enumerate(args.text_files):
+for text_file in tqdm(args.text_files, desc="Processing files", total=len(args.text_files)):
 
     # Check if the file has been processed before
     with shelve.open(args.persist) as shelf:
@@ -69,33 +79,65 @@ for i_file, text_file in enumerate(args.text_files):
     with open(text_file, 'r') as f:
         file_content = f.read()
 
-    # APPLY the prompt to the file content
-    prompt_with_content = f"{args.prompt}\n\n{file_content}"
-    response = chat_session.send_message(prompt_with_content)
-    response_text = response.parts[0].text
 
     # Interactively confirm, and if not, edit output
-    if args.interact:
-        while True:
-            print(f"[red]{prompt_with_content}[/red]")
-            print(f"[green]{response_text}[/green]")
-            is_okay = input("Is this okay? (y/N): ").strip().lower()
-            if is_okay == 'y':
-                break
-            elif is_okay.lower() == 'n':
-                response_text = utils.edit_content_with_editor(
-                    prompt_with_content, response_text, args.editor)
-            else:
-                continue
+    start_index = len(chat_session.history)
+    curr_index = start_index
+    apply_prompt = True
+    is_okay = ''
+    while True:
+
+        if apply_prompt:
+            prompt = args.prompt if args.prompt or is_okay == 'c' \
+                                 else input("Please enter a prompt:\n")
+
+            # APPLY the prompt to the file content
+            prompt_with_content = f"""
+            <request>{prompt}</request>
+            <content>{file_content}</content>
+            """
+            response = chat_session.send_message(prompt_with_content)
+            curr_index += 1
+            response_text = response.parts[0].text
+        
+        print(f"[red]{prompt_with_content}[/red]")
+        print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
+        print(f"[green]{response_text}[/green]")
+        is_okay = input("Is this okay? (y/m/c/q): ").strip().lower() \
+                        if not args.yes else 'y'
+
+        if is_okay == 'y':
+            break
+        elif is_okay == 'm':
+            apply_prompt = False
+            response_text = utils.edit_content_with_editor(
+                prompt_with_content, response_text, args.editor)
+        elif is_okay == 'c':
+            apply_prompt = True
+            prompt = utils.edit_content_with_editor(
+                prompt_with_content, response_text, args.editor)
+        elif is_okay == 'q':
+            print("Quitting...")
+            sys.exit()
+        else:
+            continue
 
     # Save the output with appended string
-    output_filename = f"{os.path.splitext(text_file)[0]}{args.append}{os.path.splitext(text_file)[1]}"
+    output_filename = os.path.join(os.path.dirname(text_file), 
+                                   ".".join(text_file.split('.')[:-1]) + 
+                                   args.append + 
+                                   '.' + text_file.split('.')[-1])
+
     with open(output_filename, 'w') as out_f:
         out_f.write(response_text)
 
     # Save the current state to the shelve dictionary
     with shelve.open(args.persist) as shelf:
+        input_indices = slice(start_index, len(chat_session.history) - 2, 2)
+        output_indices = slice(start_index + 1, len(chat_session.history) - 1, 2)
         shelf['history'] = chat_session.history
-        shelf[text_file] = {'input_index': len(chat_session.history) - 2, 'output_index': len(chat_session.history) - 1}
+        input_index = len(chat_session.history) - 2 if 
+        shelf[text_file] = {'input_index':  input_indices,
+                            'output_index': output_indices}
 
 print("Processing complete. Output files created.")
