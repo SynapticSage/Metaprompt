@@ -1,6 +1,10 @@
 # Metaprompt
 
-Metaprompt is a repository for productivity-enhancing metaprompts. This repository will expand over time to include various metaprompting endeavors. Currently, it includes a script for applying prompts to a list of text files using the `google.generativeai` library.
+Metaprompt is a repository for productivity-enhancing metaprompts. This repository will expand over time to include various metaprompting. 
+
+Currently, it includes:
+
+- `prompt_cycle` - a script for applying prompts to a list of text files using the `google.generativeai` library.
 
 ## Features
 

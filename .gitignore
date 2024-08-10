@@ -3,5 +3,5 @@ src/__pycache__
 your_project_name.egg-info
 data/
 core/
-!core/core_example.py
+!core/example_google_aistudio_history.py
 .aider*
