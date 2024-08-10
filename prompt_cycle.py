@@ -33,10 +33,17 @@ parser.add_argument('text_files', nargs='+', help='List of text files to process
 parser.add_argument('core', nargs='?', type=str, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=False, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
 parser.add_argument('--append', default="_work", help='String to append to the output filename')
+parser.add_argument('--prepend', default="", help='String to append to the output filename')
 parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
 parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
 parser.add_argument('--persist', default="{CORE}", required=False, help='File location to persist the shelve dictionary')
 parser.add_argument('--ignore_checkpoint', action='store_true', help='Ignore the checkpoint file')
+ynmc_help = """
+y: yes
+m: modify prompt - edit the response and then decision
+c: modify content - and then prompt
+q: quit
+"""
 
 args = parser.parse_args()
 if args.core is None:
@@ -61,7 +68,8 @@ args.text_files = utils.expand_folders(args.text_files)
 chat_session = model.start_chat(history=history)
 
 # Process each file
-for text_file in tqdm(args.text_files, desc="Processing files", total=len(args.text_files)):
+for iT, text_file in tqdm(enumerate(args.text_files), 
+                      desc="Processing files", total=len(args.text_files)):
 
     # Check if the file has been processed before
     with shelve.open(args.persist) as shelf:
@@ -103,6 +111,7 @@ for text_file in tqdm(args.text_files, desc="Processing files", total=len(args.t
         print(f"[red]{prompt_with_content}[/red]")
         print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
         print(f"[green]{response_text}[/green]")
+        print(ynmc_help) if iT == 0 else None
         is_okay = input("Is this okay? (y/m/c/q): ").strip().lower() \
                         if not args.yes else 'y'
 
@@ -122,15 +131,6 @@ for text_file in tqdm(args.text_files, desc="Processing files", total=len(args.t
         else:
             continue
 
-    # Save the output with appended string
-    output_filename = os.path.join(os.path.dirname(text_file), 
-                                   ".".join(text_file.split('.')[:-1]) + 
-                                   args.append + 
-                                   '.' + text_file.split('.')[-1])
-
-    with open(output_filename, 'w') as out_f:
-        out_f.write(response_text)
-
     # Save the current state to the shelve dictionary
     with shelve.open(args.persist) as shelf:
         input_indices = slice(start_index, len(chat_session.history) - 2, 2)
@@ -139,5 +139,18 @@ for text_file in tqdm(args.text_files, desc="Processing files", total=len(args.t
         input_index = len(chat_session.history) - 2 if 
         shelf[text_file] = {'input_index':  input_indices,
                             'output_index': output_indices}
+
+    # Save the output with appended string
+    output_filename = os.path.join(os.path.dirname(text_file), 
+                                   args.prepend +
+                                   ".".join(text_file.split('.')[:-1]) + 
+                                   args.append + 
+                                   '.' + text_file.split('.')[-1])
+    if not os.path.isdir(os.path.dirname(output_filename)):
+        os.makedirs(os.path.dirname(output_filename))
+    with open(output_filename, 'w') as out_f:
+        aggregated_response = chat_session.history[start_index:curr_index]
+        out_f.write(response_text)
+
 
 print("Processing complete. Output files created.")
