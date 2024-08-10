@@ -4,3 +4,4 @@ your_project_name.egg-info
 data/
 core/
 !core/core_example.py
+.aider*

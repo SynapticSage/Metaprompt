@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 METAPROMPT, google ai studio meta prompting
+
 `prompt_cycle.py` is a script that applies a prompt to a list of text files.
 The script uses the `google.generativeai` library to generate responses to the
 prompt. The script takes the following arguments:
@@ -13,6 +14,14 @@ prompt. The script takes the following arguments:
 - `editor`: The editor to use for interactive mode (default: `nvim`).
 - `persist`: The file location to persist the shelve dictionary.
 - `ignore_checkpoint`: A flag to ignore the checkpoint file.
+
+# Examples of use cases
+- generating readmes for huge sequence of files - we want to apply a certain
+  prompt at the start of each file, and then possibly tweak the output.
+  [put code files in a folder, and point the cycler to it]
+- generating a summaries of a huge sequence of files
+- drafting email responses to a huge list of emails we need to respond to
+- drafting responses to a huge list of customer reviews
 """
 
 import os
@@ -25,7 +34,7 @@ from tqdm import tqdm
 test = False
 if test:
     import sys
-    sys.argv = ["apply.py", "data/text.txt", "core_example.py", "--prompt", "Prompt text", "--append", "_work", "--editor", "nvim", "--persist", "test.shelve"]
+    sys.argv = ["prompt_cycle.py", "data/text.txt", "core_example.py", "--prompt", "generate a response to this text", "--yes"]
 
 # Set up argparse
 parser = argparse.ArgumentParser(description='Process some files with generative AI.')
@@ -136,7 +145,6 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         input_indices = slice(start_index, len(chat_session.history) - 2, 2)
         output_indices = slice(start_index + 1, len(chat_session.history) - 1, 2)
         shelf['history'] = chat_session.history
-        input_index = len(chat_session.history) - 2 if 
         shelf[text_file] = {'input_index':  input_indices,
                             'output_index': output_indices}
 
