@@ -45,7 +45,7 @@ parser.add_argument('--append', default="_work", help='String to append to the o
 parser.add_argument('--prepend', default="../output/", help='String/folder to prepend to the output filename')
 parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
 parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
-parser.add_argument('--persist', default="{CORE}", required=False, help='File location to persist the shelve dictionary')
+parser.add_argument('--persist', default="database/{CORE}", required=False, help='File location to persist the shelve dictionary')
 parser.add_argument('--ignore_checkpoint', action='store_true', help='Ignore the checkpoint file')
 ynmc_help = """
 y: yes
@@ -57,6 +57,8 @@ q: quit
 args = parser.parse_args()
 if args.core is None:
     args.core = "default.py" if os.path.exists("core/default.py") else "core_example.py"
+    # follow links
+    args.core = os.path.realpath(args.core)
 
 # Execute the core script
 # exec(utils.get_core_script(args), globals())
@@ -65,7 +67,7 @@ chat_session = locals()['chat_session']
 model = locals()['model']
 history = chat_session.history
 
-# Load or create the shelve dictionary
+# Load or create the shelve dictionary, first access of the shelf
 history = utils.load_and_combine_history(args, history)
 
 import pdb; pdb.set_trace()
@@ -153,7 +155,8 @@ for iT, text_file in tqdm(enumerate(args.text_files),
     if not os.path.exists(output_filename):
         os.makedirs(os.path.dirname(output_filename))
     with open(output_filename, 'w') as out_f:
-        aggregated_response = chat_session.history[start_index:curr_index]
+        divider = ("\n"+(79*"-")+"\n")
+        aggregated_response = divider.join(chat_session.history[start_index:curr_index])
         out_f.write(response_text)
 
 

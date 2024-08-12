@@ -66,8 +66,8 @@ def load_and_combine_history(args,
         core = args.core[0]
     else:
         core = args.core
-    if args.persist == "{CORE}":
-        args.persist = f"{os.path.basename(core).split('.')[0]}.shelve"
+    args.persist = string_substitute(args.persist)
+    args.persist = f"{os.path.basename(core).split('.')[0]}.shelve"
     if os.path.dirname(args.persist) and not os.path.exists(os.path.dirname(args.persist)): 
         os.makedirs(os.path.dirname(args.persist))
     with shelve.open(args.persist) as shelf:
@@ -120,3 +120,25 @@ def create_output_filename(text_file, args):
     return os.path.join(os.path.dirname(text_file), 
                         args.prepend + ".".join(text_file.split('.')[:-1]) + \
                         args.append + '.' + text_file.split('.')[-1])
+
+def string_substitute(string:str, args)->str:
+    """
+    Substitute the string with the globals() values. Can swap the following:
+    {CORE} -> args.core
+    {DATE} -> datetime.datetime.now
+
+    Inputs
+    ------
+    string : str
+        The string to substitute.
+    args : argparse.Namespace
+        The command line arguments.
+
+    """
+    import datetime
+    if "{CORE}" in string:
+        string = string.replace("{CORE}", args.core)
+    if "{DATE} " in string:
+        date = datetime.datetime.now()
+        string = string.replace("{DATE}", date.today().strftime('%Y-%m-%d'))
+    return string
