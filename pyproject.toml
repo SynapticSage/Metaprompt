@@ -15,7 +15,15 @@ classifiers = [
 	"License :: OSI Approved :: MIT License",
 	"Operating System :: OS Independent",
 ]
-dependencies = ["google-generativeai", "rich", "tqdm", "ipython", "pandas"]
+dependencies = [
+	"google-generativeai",
+	"rich",
+	"tqdm",
+	"ipython",
+	"pandas",
+	"streamlit",
+	"watchdog",
+]
 
 [project.urls]
 Homepage = "https://github.com/synapticsage/metaprompt"
