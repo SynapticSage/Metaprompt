@@ -112,3 +112,11 @@ def expand_folders(text_files):
         else:
             expanded_files.append(text_file)
     return expanded_files
+
+def create_output_filename(text_file, args):
+    """
+    Create the output filename based on the input filename and the append/prepend strings.
+    """
+    return os.path.join(os.path.dirname(text_file), 
+                        args.prepend + ".".join(text_file.split('.')[:-1]) + \
+                        args.append + '.' + text_file.split('.')[-1])

@@ -42,7 +42,7 @@ parser.add_argument('text_files', nargs='+', help='List of text files to process
 parser.add_argument('core', nargs='?', type=str, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=False, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
 parser.add_argument('--append', default="_work", help='String to append to the output filename')
-parser.add_argument('--prepend', default="", help='String to append to the output filename')
+parser.add_argument('--prepend', default="../output/", help='String/folder to prepend to the output filename')
 parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
 parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
 parser.add_argument('--persist', default="{CORE}", required=False, help='File location to persist the shelve dictionary')
@@ -149,12 +149,8 @@ for iT, text_file in tqdm(enumerate(args.text_files),
                             'output_index': output_indices}
 
     # Save the output with appended string
-    output_filename = os.path.join(os.path.dirname(text_file), 
-                                   args.prepend +
-                                   ".".join(text_file.split('.')[:-1]) + 
-                                   args.append + 
-                                   '.' + text_file.split('.')[-1])
-    if not os.path.isdir(os.path.dirname(output_filename)):
+    output_filename = utils.create_output_filename(text_file, args)
+    if not os.path.exists(output_filename):
         os.makedirs(os.path.dirname(output_filename))
     with open(output_filename, 'w') as out_f:
         aggregated_response = chat_session.history[start_index:curr_index]

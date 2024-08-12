@@ -5,3 +5,4 @@ data/
 core/
 !core/example_google_aistudio_history.py
 .aider*
+output/
