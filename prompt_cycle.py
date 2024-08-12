@@ -28,7 +28,7 @@ import os
 import argparse
 import shelve
 from rich import print
-from src import utils
+from metaprompt import utils
 from tqdm import tqdm
 
 test = False
@@ -56,7 +56,8 @@ q: quit
 
 args = parser.parse_args()
 if args.core is None:
-    args.core = "default.py" if os.path.exists("core/default.py") else "core_example.py"
+    args.core = ("core/default.py" if os.path.exists("core/default.py") else
+                 "core/core_example.py")
     # follow links
     args.core = os.path.realpath(args.core)
 
@@ -69,8 +70,6 @@ history = chat_session.history
 
 # Load or create the shelve dictionary, first access of the shelf
 history = utils.load_and_combine_history(args, history)
-
-import pdb; pdb.set_trace()
 
 # Expand out any folders
 args.text_files = utils.expand_folders(args.text_files)
@@ -115,6 +114,7 @@ for iT, text_file in tqdm(enumerate(args.text_files),
             <request>{prompt}</request>
             <content>{file_content}</content>
             """
+            import pdb; pdb.set_trace()
             response = chat_session.send_message(prompt_with_content)
             curr_index += 1
             response_text = response.parts[0].text

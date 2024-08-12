@@ -62,12 +62,9 @@ def load_and_combine_history(args,
     if append and prepend are both True, append takes precedence
     if append and prepend are both False, the longer history takes precedence
     """
-    if isinstance(args.core, (list, tuple)):
-        core = args.core[0]
-    else:
-        core = args.core
-    args.persist = string_substitute(args.persist)
-    args.persist = f"{os.path.basename(core).split('.')[0]}.shelve"
+    args.persist = string_substitute(args.persist, args)
+    args.persist = ".".join(args.persist.split('.')[:-1]) + '.shelve'
+    args.persist = os.path.abspath(args.persist)
     if os.path.dirname(args.persist) and not os.path.exists(os.path.dirname(args.persist)): 
         os.makedirs(os.path.dirname(args.persist))
     with shelve.open(args.persist) as shelf:
@@ -117,9 +114,11 @@ def create_output_filename(text_file, args):
     """
     Create the output filename based on the input filename and the append/prepend strings.
     """
-    return os.path.join(os.path.dirname(text_file), 
+    output_filename = os.path.join(os.path.dirname(text_file), 
                         args.prepend + ".".join(text_file.split('.')[:-1]) + \
                         args.append + '.' + text_file.split('.')[-1])
+    output_filename = string_substitute(output_filename, args)
+    return output_filename
 
 def string_substitute(string:str, args)->str:
     """
@@ -137,7 +136,11 @@ def string_substitute(string:str, args)->str:
     """
     import datetime
     if "{CORE}" in string:
-        string = string.replace("{CORE}", args.core)
+        if isinstance(args.core, (list, tuple)):
+            core = os.path.basename(args.core[0])
+        else:
+            core = os.path.basename(args.core)
+        string = string.replace("{CORE}", core)
     if "{DATE} " in string:
         date = datetime.datetime.now()
         string = string.replace("{DATE}", date.today().strftime('%Y-%m-%d'))
