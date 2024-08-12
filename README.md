@@ -23,7 +23,7 @@ Currently, it includes:
 
 2. Install the required dependencies:
     ```sh
-    pip install -r requirements.txt
+    pip install .
     ```
 
 ## Usage
