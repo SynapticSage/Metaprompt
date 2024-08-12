@@ -117,42 +117,49 @@ def main(*args):
         skipped = False
         while True:
 
-            if apply_prompt:
+            iC = len(chat_session.history)
 
-                # APPLY the prompt to the file content
-                prompt_with_content = f"""
-               {'<request>{prompt}</request>' if iT == start_index else ''}\n
-               """ \
-               f"""
-               <content>{file_content}</content>
-               """
-                import pdb; pdb.set_trace()
-                response = chat_session.send_message(prompt_with_content)
+            if apply_prompt:
+                # Determine what to say
+                inst = "user_request" if iC == start_index else "user_response"
+                content = args.prompt if iC == start_index else response_text \
+                if 'response_text' in locals() \
+                else None
+                if content is None:
+                    raise ValueError("Content is None. This should not happen.")
+                message_to_agent = (
+                   f"""
+                   {f'<content>{file_content}</content>' if iC == start_index else ''}
+                   """
+                   f'<{inst}>{content}</{inst}>\n'
+                   )
+                # import pdb; pdb.set_trace()
+                # Say it and get the response
+                response = chat_session.send_message(message_to_agent)
                 response_text = response.parts[0].text
             
-            if 'response' in locals():
-                print(f"[red]{prompt_with_content}[/red]")
-                print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
-                print(f"[green]{response_text}[/green]")
+            print(f"[red]{message_to_agent}[/red]")
+            print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
+            print(f"[green]{response_text}[/green]")
 
             print(ynmc_help) if iT == 0 else None
-            is_okay = input("Is this okay? (y/m/c/q): ").strip().lower() \
+            is_okay = input("Is this okay? (y/m/c/q) [d/p]: ").strip().lower() \
                             if not args.yes else 'y'
 
-            if is_okay == 'y': # if okay, break
+            if is_okay.startswith('y'): # if okay, break
                 break
-            elif is_okay == 'm': # if modify, edit the response
+            elif is_okay.startswith('m'): # if modify, edit the response
                 apply_prompt = False
                 response_text = utils.edit_content_with_editor(
-                    prompt_with_content, response_text, args.editor)
-            elif is_okay == 'r': # if return, edit the response and return to prompt
+                    message_to_agent, response_text, args.editor)
+            elif is_okay.startswith('r'): # if return, edit the response and return to prompt
                 apply_prompt = True
                 prompt = utils.edit_content_with_editor(
-                    prompt_with_content, response_text, args.editor)
-            elif is_okay == 'q':
+                    message_to_agent, response_text, args.editor)
+            elif is_okay.startswith('q'):
                 print("Quitting...")
                 sys.exit()
-            elif is_okay == 's': # if skip, skip this file
+            elif is_okay.startswith('s'): # if skip, skip this file
                 print("Skipping...")
                 skipped = True
                 break
