@@ -8,3 +8,4 @@ core/
 output/
 metaprompt/__pycache__
 metaprompt.egg-info
+test/__pycache__
