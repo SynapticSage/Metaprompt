@@ -145,3 +145,6 @@ def string_substitute(string:str, args)->str:
         date = datetime.datetime.now()
         string = string.replace("{DATE}", date.today().strftime('%Y-%m-%d'))
     return string
+
+def shelf(args):
+    return shelve.open(args.persist)

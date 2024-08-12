@@ -35,6 +35,9 @@ from tqdm import tqdm
 
 # Set up argparse
 def main(*args):
+    """
+    see file header for details
+    """
 
     parser = argparse.ArgumentParser(description='Process some files with generative AI.')
     parser.add_argument('text_files', nargs='+', help='List of text files to process')
@@ -47,6 +50,7 @@ def main(*args):
     parser.add_argument('--editor', default='nvim', help='Editor to use for interactive mode (default: nvim)')
     parser.add_argument('--persist', default="database/{CORE}", required=False, help='File location to persist the shelve dictionary')
     parser.add_argument('--ignore_checkpoint', action='store_true', help='Ignore the checkpoint file')
+    parser.add_argument('--skipN', type=int, default=0, help='Skip the first N files')
     ynmc_help = """
     y: yes
     m: modify prompt - edit the response and then decision
@@ -64,9 +68,10 @@ def main(*args):
     # Execute the core script
     # exec(utils.get_core_script(args), globals())
     utils.run_core_script(args)
-    chat_session = locals()['chat_session']
-    model = locals()['model']
+    chat_session = globals()['chat_session']
+    model = globals()['model']
     history = chat_session.history
+    globals()['args'] = args
 
     # Load or create the shelve dictionary, first access of the shelf
     history = utils.load_and_combine_history(args, history)
@@ -80,6 +85,10 @@ def main(*args):
     # Process each file
     for iT, text_file in tqdm(enumerate(args.text_files), 
                           desc="Processing files", total=len(args.text_files)):
+
+        if iT < args.skipN:
+            print(f"[yellow]Skipping {text_file}[/yellow]")
+            continue
 
         # Check if the file has been processed before
         with shelve.open(args.persist) as shelf:
@@ -103,9 +112,9 @@ def main(*args):
 
         # Interactively confirm, and if not, edit output
         start_index = len(chat_session.history)
-        curr_index = start_index
         apply_prompt = True
         is_okay = ''
+        skipped = False
         while True:
 
             if apply_prompt:
@@ -119,12 +128,13 @@ def main(*args):
                """
                 import pdb; pdb.set_trace()
                 response = chat_session.send_message(prompt_with_content)
-                curr_index += 1
                 response_text = response.parts[0].text
             
-            print(f"[red]{prompt_with_content}[/red]")
-            print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
-            print(f"[green]{response_text}[/green]")
+            if 'response' in locals():
+                print(f"[red]{prompt_with_content}[/red]")
+                print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
+                print(f"[green]{response_text}[/green]")
+
             print(ynmc_help) if iT == 0 else None
             is_okay = input("Is this okay? (y/m/c/q): ").strip().lower() \
                             if not args.yes else 'y'
@@ -144,6 +154,7 @@ def main(*args):
                 sys.exit()
             elif is_okay == 's': # if skip, skip this file
                 print("Skipping...")
+                skipped = True
                 break
 
             if 'd' in is_okay:
@@ -153,26 +164,28 @@ def main(*args):
                 args.newprompt_on_break = not args.newprompt_on_break
 
         # Save the current state to the shelve dictionary
-        with shelve.open(args.persist) as shelf:
-            input_indices = slice(start_index, len(chat_session.history) - 2, 2)
-            output_indices = slice(start_index + 1, len(chat_session.history) - 1, 2)
-            if len(output_indices) == 0:
-                import warnings
-                warnings.warn(f"Skipping {text_file} as no output was generated.")
-                # TODO: add an option where when this occurs, users can open a
-                # file dialog to select a file to save the output
-            shelf['history'] = chat_session.history
-            shelf[text_file] = {'input_index':  input_indices,
-                                'output_index': output_indices}
+        if not skipped:
 
-        # Save the output with appended string
-        output_filename = utils.create_output_filename(text_file, args)
-        if not os.path.exists(output_filename):
-            os.makedirs(os.path.dirname(output_filename))
-        with open(output_filename, 'w') as out_f:
-            divider = ("\n"+(79*"-")+"\n")
-            aggregated_response = divider.join(chat_session.history[start_index:curr_index])
-            out_f.write(response_text)
+            with shelve.open(args.persist) as shelf:
+                input_indices = slice(start_index, len(chat_session.history) - 2, 2)
+                output_indices = slice(start_index + 1, len(chat_session.history) - 1, 2)
+                if len(output_indices) == 0:
+                    import warnings
+                    warnings.warn(f"Skipping {text_file} as no output was generated.")
+                    # TODO: add an option where when this occurs, users can open a
+                    # file dialog to select a file to save the output
+                shelf['history'] = chat_session.history
+                shelf[text_file] = {'input_index':  input_indices,
+                                    'output_index': output_indices}
+
+            # Save the output with appended string
+            output_filename = utils.create_output_filename(text_file, args)
+            if not os.path.exists(output_filename):
+                os.makedirs(os.path.dirname(output_filename))
+            with open(output_filename, 'w') as out_f:
+                divider = ("\n"+(79*"-")+"\n")
+                aggregated_response = divider.join(chat_session.history[start_index:len(chat_session.history)])
+                out_f.write(response_text) 
 
         # If prompt on break, display the upcoming `text_file` and ask for a new
         # prompt
