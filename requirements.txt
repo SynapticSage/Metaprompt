@@ -1,6 +1,0 @@
-rich 
-google-generativeai
-ipython
-pdbpp
-ipython # during test and development
-pytest # during test and development
