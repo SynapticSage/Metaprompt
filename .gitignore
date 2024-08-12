@@ -7,3 +7,4 @@ core/
 .aider*
 output/
 metaprompt/__pycache__
+metaprompt.egg-info

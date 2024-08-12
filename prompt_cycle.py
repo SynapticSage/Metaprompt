@@ -41,6 +41,7 @@ parser = argparse.ArgumentParser(description='Process some files with generative
 parser.add_argument('text_files', nargs='+', help='List of text files to process')
 parser.add_argument('core', nargs='?', type=str, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=False, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
+parser.add_argument('--newprompt_on_break', action='store_true', help='Prompt for a new prompt on break')
 parser.add_argument('--append', default="_work", help='String to append to the output filename')
 parser.add_argument('--prepend', default="../output/", help='String/folder to prepend to the output filename')
 parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
@@ -98,6 +99,9 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         file_content = f.read()
 
 
+    args.prompt = args.prompt if args.prompt \
+                         else input("Please enter a prompt:\n")
+
     # Interactively confirm, and if not, edit output
     start_index = len(chat_session.history)
     curr_index = start_index
@@ -106,14 +110,14 @@ for iT, text_file in tqdm(enumerate(args.text_files),
     while True:
 
         if apply_prompt:
-            prompt = args.prompt if args.prompt or is_okay == 'c' \
-                                 else input("Please enter a prompt:\n")
 
             # APPLY the prompt to the file content
             prompt_with_content = f"""
-            <request>{prompt}</request>
-            <content>{file_content}</content>
-            """
+           {'<request>{prompt}</request>' if iT == start_index else ''}\n
+           """ \
+           f"""
+           <content>{file_content}</content>
+           """
             import pdb; pdb.set_trace()
             response = chat_session.send_message(prompt_with_content)
             curr_index += 1
@@ -126,21 +130,25 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         is_okay = input("Is this okay? (y/m/c/q): ").strip().lower() \
                         if not args.yes else 'y'
 
-        if is_okay == 'y':
+        if is_okay == 'y': # if okay, break
             break
-        elif is_okay == 'm':
+        elif is_okay == 'm': # if modify, edit the response
             apply_prompt = False
             response_text = utils.edit_content_with_editor(
                 prompt_with_content, response_text, args.editor)
-        elif is_okay == 'c':
+        elif is_okay == 'r': # if return, edit the response and return to prompt
             apply_prompt = True
             prompt = utils.edit_content_with_editor(
                 prompt_with_content, response_text, args.editor)
         elif is_okay == 'q':
             print("Quitting...")
             sys.exit()
-        else:
-            continue
+
+        if 'd' in is_okay:
+            import pdb; pdb.set_trace()
+        if 'p' in is_okay:
+            # toggle change prompt on break
+            args.newprompt_on_break = not args.newprompt_on_break
 
     # Save the current state to the shelve dictionary
     with shelve.open(args.persist) as shelf:
@@ -158,6 +166,12 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         divider = ("\n"+(79*"-")+"\n")
         aggregated_response = divider.join(chat_session.history[start_index:curr_index])
         out_f.write(response_text)
+
+    # If prompt on break, display the upcoming `text_file` and ask for a new
+    # prompt
+    if args.newprompt_on_break:
+        print(f"[yellow]Upcoming file: {text_file}[/yellow]")
+        args.prompt = input("Please enter a new prompt:\n")
 
 
 print("Processing complete. Output files created.")
