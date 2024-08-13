@@ -2,6 +2,10 @@ import os
 import shelve
 import subprocess
 import tempfile
+from google.generativeai.generative_models import ChatSession
+from rich import print
+import argparse
+
 folder = os.path.dirname(__file__)
 corefolder = os.path.abspath(os.path.join(folder, '..', 'core'))
 
@@ -33,10 +37,20 @@ def run_core_script(args):
     core = os.path.join(corefolder, args.core)
     if not os.path.exists(core):
         raise FileNotFoundError(f"Core script {core} not found.")
-    ipython = get_ipython()
-    ipython.run_line_magic(f'run', f'-i "{core}"')
-    for var in ipython.user_ns:
-        globals()[var] = ipython.user_ns[var]
+    try:
+        ipython = get_ipython()
+        ipython.run_line_magic(f'run', f'-i "{core}"')
+        assert 'chat_session' in ipython.user_ns, f"chat_session not found in core script {core}"
+        for var in ipython.user_ns:
+            globals()[var] = ipython.user_ns[var]
+    except Exception as e:
+        try:
+            exec(open(core).read())
+            assert 'chat_session' in locals(), f"chat_session not found in core script {core}"
+            for var in locals():
+                globals()[var] = locals()[var]
+        except Exception as e:
+            raise e
 
 def load_and_combine_history(args, 
                 history:list=[], 
@@ -148,3 +162,37 @@ def string_substitute(string:str, args)->str:
 
 def shelf(args):
     return shelve.open(args.persist)
+
+def persist_text_file_conversation(args:argparse.Namespace,
+                                   chat_session:ChatSession, 
+                                   start_index:int):
+    """
+    Persist the text file conversation to a shelve file.
+    """
+    with shelve.open(args.persist) as shelf:
+        input_indices = slice(start_index, len(chat_session.history) - 2, 2)
+        output_indices = slice(start_index + 1, len(chat_session.history) - 1, 2)
+        slice_len = (output_indices.stop - 
+                     output_indices.start)
+        if slice_len < 0:
+            # TODO: add an option where when this occurs, users can open a
+            # file dialog to select a file to save the output
+            import warnings
+            warnings.warn("No conversation to save to shelve with slice={}".format(output_indices))
+        else:
+            print("Saving to shelve...")
+            shelf['history'] = chat_session.history
+            shelf[text_file] = {'input_index':  input_indices,
+                                'output_index': output_indices}
+
+
+def print_message(response, message_to_agent, type_of_message=""):
+    from rich.markdown import Markdown
+    from rich.console import Console
+    response_text = response.parts[0].text
+    with Console() as console:
+        console.print(f"[bold]{type_of_message}[/bold]")
+        console.print(f"[red]{message_to_agent}[/red]")
+        console.print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
+        # print(f"[blue]Token cost: {response.usage_metadata.candidates_token_count}[/blue]")
+        console.print(f"[green]{response_text}[/green]")
