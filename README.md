@@ -4,7 +4,7 @@ Metaprompt is a repository for productivity-enhancing metaprompts. This reposito
 
 Currently, it includes:
 
-- `prompt_cycle` - a script for applying prompts to a list of text files using the `google.generativeai` library.
+- `apply` - a script for applying prompts to a list of text files using the `google.generativeai` library.
 
 ## Features
 
@@ -28,7 +28,7 @@ Currently, it includes:
 
 ## Usage
 
-The main script in this repository is `prompt_cycle.py`. It applies a prompt to a list of text files and generates responses using the `google.generativeai` library.
+The main script in this repository is `apply.py`. It applies a prompt to a list of text files and generates responses using the `google.generativeai` library.
 
 ### Examples of Use Cases
 
@@ -53,7 +53,7 @@ The main script in this repository is `prompt_cycle.py`. It applies a prompt to 
 ### Example Usage
 
 ```sh
-python prompt_cycle.py data/text.txt core_example.py --prompt "Generate a response to this text" --yes --newprompt_on_break 
+python apply.py data/text.txt core_example.py --prompt "Generate a response to this text" --yes --newprompt_on_break 
 ```
 
 This command processes the `data/text.txt` file using the `core_example.py` script and applies the prompt "Generate a response to this text". The `--yes` flag automatically confirms all prompts.

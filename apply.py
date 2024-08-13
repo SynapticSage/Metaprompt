@@ -2,7 +2,7 @@
 """
 METAPROMPT, google ai studio meta prompting
 
-`prompt_cycle.py` is a script that applies a prompt to a list of text files.
+`apply.py` is a script that applies a prompt to a list of text files.
 The script uses the `google.generativeai` library to generate responses to the
 prompt. The script takes the following arguments:
 
