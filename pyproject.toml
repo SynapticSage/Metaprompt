@@ -23,6 +23,7 @@ dependencies = [
 	"pandas",
 	"streamlit",
 	"watchdog",
+	"ipython",             # defaults for running core script - if not present or not interact mode, will run less secure exec() method
 ]
 
 [project.urls]

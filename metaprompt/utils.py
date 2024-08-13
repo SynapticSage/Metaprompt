@@ -108,7 +108,7 @@ def edit_content_with_editor(prompt, response, editor):
     os.remove(tmpfile_path)
     return edited_content
 
-def expand_folders(text_files):
+def expand_folders(text_files, sort=None):
     """
     Expand any folders in the list of files of args.text_files.
 
@@ -122,6 +122,12 @@ def expand_folders(text_files):
                     expanded_files.append(os.path.join(root, file))
         else:
             expanded_files.append(text_file)
+    if sort == "acc" or sort == "forward" or sort == True:
+        expanded_files = sorted(expanded_files)
+    elif sort == "dec" or sort == "rev" or sort == "reverse":
+        expanded_files = sorted(expanded_files, reverse=True)
+    else:
+        pass
     return expanded_files
 
 def create_output_filename(text_file, args):

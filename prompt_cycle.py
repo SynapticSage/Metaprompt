@@ -45,6 +45,7 @@ parser.add_argument('text_files', nargs='+', help='List of text files to process
 parser.add_argument('core', nargs='?', type=str, help='Core conversation script to execute from the ./core folder')
 parser.add_argument('--prompt', required=False, help='Prompt to apply to each file') # TODO: if not provided, check stdin, and if still not, ask for it
 parser.add_argument('--newprompt_on_break', action='store_true', help='Prompt for a new prompt on break')
+parser.add_argument('--sort', default='reverse', help='Sort the files in reverse order')
 parser.add_argument('--append', default="_work", help='String to append to the output filename')
 parser.add_argument('--prepend', default="../outputs/", help='String/folder to prepend to the output filename')
 parser.add_argument('--yes', '-y', action='store_true', help='Automatically confirm all prompts')
@@ -57,6 +58,11 @@ y: yes
 m: modify prompt - edit the response and then decision
 c: modify content - and then prompt
 q: quit
+i: insert text
+a: append text
+
+d: debug
+p: toggle new prompt on break
 """
 
 if 'args' not in locals(): 
@@ -83,12 +89,13 @@ globals()['args'] = args
 history = utils.load_and_combine_history(args, history)
 
 # Expand out any folders
-args.text_files = utils.expand_folders(args.text_files)
+args.text_files = utils.expand_folders(args.text_files, sort=args.sort)
 
 # Start chat session with history
 chat_session = model.start_chat(history=history)
 
 # Process each file
+shown_help = False
 for iT, text_file in tqdm(enumerate(args.text_files), 
                       desc="Processing files", total=len(args.text_files)):
 
@@ -179,7 +186,8 @@ for iT, text_file in tqdm(enumerate(args.text_files),
             raise ValueError("Prompt mode is not recognized.")
         
 
-        print(ynmc_help) if iT == 0 else None
+        print(ynmc_help) if shown_help else None
+        if not shown_help: shown_help = True
         is_okay = input("Is this okay? (y/m/c/q/i/a) [d/p]: ").strip().lower() \
                         if not args.yes else 'y'
 
