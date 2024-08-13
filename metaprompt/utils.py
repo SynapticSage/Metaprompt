@@ -82,6 +82,7 @@ def load_and_combine_history(args,
     if os.path.dirname(args.persist) and not os.path.exists(os.path.dirname(args.persist)): 
         os.makedirs(os.path.dirname(args.persist))
     with shelve.open(args.persist) as shelf:
+        import google.ai # used in unpickling
         if 'history' in shelf:
             if append:
                 history = shelf['history'] + history
@@ -171,7 +172,9 @@ def shelf(args):
 
 def persist_text_file_conversation(args:argparse.Namespace,
                                    chat_session:ChatSession, 
-                                   start_index:int):
+                                   text_file:str,
+                                   start_index:int,
+                                   is_final:bool=False):
     """
     Persist the text file conversation to a shelve file.
     """
@@ -190,15 +193,14 @@ def persist_text_file_conversation(args:argparse.Namespace,
             shelf['history'] = chat_session.history
             shelf[text_file] = {'input_index':  input_indices,
                                 'output_index': output_indices}
+            shelf[text_file]['final'] = is_final
 
 
-def print_message(response, message_to_agent, type_of_message=""):
+def print_message(response):
     from rich.markdown import Markdown
     from rich.console import Console
     response_text = response.parts[0].text
     with Console() as console:
-        console.print(f"[bold]{type_of_message}[/bold]")
-        console.print(f"[red]{message_to_agent}[/red]")
         console.print(f"[blue]Token count: {response.usage_metadata.candidates_token_count}[/blue]")
         # print(f"[blue]Token cost: {response.usage_metadata.candidates_token_count}[/blue]")
         console.print(f"[green]{response_text}[/green]")

@@ -32,6 +32,7 @@ from rich import print
 from metaprompt import utils
 from tqdm import tqdm
 import sys
+from rich.console import Console
 
 
 # Set up argparse
@@ -96,6 +97,7 @@ chat_session = model.start_chat(history=history)
 
 # Process each file
 shown_help = False
+console = Console()
 for iT, text_file in tqdm(enumerate(args.text_files), 
                       desc="Processing files", total=len(args.text_files)):
 
@@ -108,13 +110,15 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         if not args.ignore_checkpoint and text_file in shelf:
             input_index = shelf[text_file]['input_index']
             output_index = shelf[text_file]['output_index']
-            input_text = chat_session.history[input_index].parts[0].text
-            output_text = chat_session.history[output_index].parts[0].text
-            print(f"[yellow]Processing {text_file}[/yellow]")
-            print(f"Input: {input_text}")
-            print(f"Output: {output_text}")
-            print(f"[yellow]Skipping {text_file} as it has already been processed.[/yellow]")
-            continue
+            is_final = shelf[text_file]['final']
+            if is_final: # if final, skip this file
+                input_text = chat_session.history[input_index].parts[0].text
+                output_text = chat_session.history[output_index].parts[0].text
+                print(f"[yellow]Processing {text_file}[/yellow]")
+                print(f"Input: {input_text}")
+                print(f"Output: {output_text}")
+                print(f"[yellow]Skipping {text_file} as it has already been processed.[/yellow]")
+                continue
 
     with open(text_file, 'r') as f:
         file_content = f.read()
@@ -133,6 +137,7 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         iC = len(chat_session.history)
 
         # Handle prompt mode
+        # import pdb; pdb.set_trace()
         if prompt_mode == 'standard':
             # Determine what to say
             inst = "user_request" if iC == start_index else "user_response"
@@ -149,9 +154,11 @@ for iT, text_file in tqdm(enumerate(args.text_files),
                )
             # import pdb; pdb.set_trace()
             # Say it and get the response
-            response = chat_session.send_message(message_to_agent)
+            print(f"[yellow]{message_to_agent}[/yellow]")
+            with console.status("Sending message..."):
+                response = chat_session.send_message(message_to_agent)
             response_text = response.parts[0].text
-            utils.print_message(response, message_to_agent)
+            utils.print_message(response)
         elif prompt_mode == 'insert':
             insertion = input("Please enter the insertion text: ")
             message_to_agent = (
@@ -160,9 +167,11 @@ for iT, text_file in tqdm(enumerate(args.text_files),
                 {f'<content>{editor_output}</content>' if iC == start_index else ''}
                 """
                 )
-            response = chat_session.send_message(message_to_agent)
+            print(f"[yellow]{message_to_agent}[/yellow]")
+            with console.status("Sending message..."):
+                response = chat_session.send_message(message_to_agent)
             response_text = response.parts[0].text
-            utils.print_message(response, message_to_agent)
+            utils.print_message(response)
         elif prompt_mode == 'append':
             append = input("Please enter the appended text: ")
             message_to_agent = (
@@ -171,9 +180,11 @@ for iT, text_file in tqdm(enumerate(args.text_files),
                 """
                 f'<user>{append}</user>\n'
                 )
-            response = chat_session.send_message(message_to_agent)
+            print(f"[yellow]{message_to_agent}[/yellow]")
+            with console.status("Sending message..."):
+                response = chat_session.send_message(message_to_agent)
             response_text = response.parts[0].text
-            utils.print_message(response, message_to_agent)
+            utils.print_message(response)
         elif prompt_mode == 'skip':
             # Taking the following approach to make linters happy
             response, response_text = ((None, None) 
@@ -185,8 +196,8 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         else:
             raise ValueError("Prompt mode is not recognized.")
         
-
-        print(ynmc_help) if shown_help else None
+        import pdb; pdb.set_trace()
+        print(ynmc_help) if not shown_help else None
         if not shown_help: shown_help = True
         is_okay = input("Is this okay? (y/m/c/q/i/a) [d/p]: ").strip().lower() \
                         if not args.yes else 'y'
@@ -214,6 +225,10 @@ for iT, text_file in tqdm(enumerate(args.text_files),
         # an option to cycle back with a appended message
         elif is_okay.startswith('a'):
             pass
+        # save the current state
+        elif is_okay.startswith('w'):
+            utils.persist_text_file_conversation(args, chat_session, start_index, is_final=False)
+
 
         if 'd' in is_okay:
             import pdb; pdb.set_trace()
@@ -221,7 +236,6 @@ for iT, text_file in tqdm(enumerate(args.text_files),
             # toggle change prompt on break
             args.newprompt_on_break = not args.newprompt_on_break
 
-        utils.persist_text_file_conversation(args, chat_session, start_index)
 
     # Save the current state to the shelve dictionary
     if not skipped:
